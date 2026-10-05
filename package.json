@@ -1,0 +1,33 @@
+{
+  "name": "clinicvoice",
+  "private": true,
+  "description": "AI voice agent for a fictional MRI & CT clinic (synthetic data only)",
+  "type": "module",
+  "packageManager": "pnpm@12.4.1",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @clinicvoice/server dev",
+    "dev:dashboard": "pnpm --filter @clinicvoice/dashboard dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "pnpm -r test",
+    "db:up": "docker compose up -d postgres",
+    "db:migrate": "pnpm --filter @clinicvoice/db migrate",
+    "seed": "pnpm --filter @clinicvoice/db seed"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.6.4",
+    "eslint": "^10.12.0",
+    "prettier": "^3.9.9",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.0",
+    "vitest": "^5.0.3"
+  }
+}

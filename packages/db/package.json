@@ -1,0 +1,37 @@
+{
+  "name": "@clinicvoice/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "@clinicvoice/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./seed": {
+      "@clinicvoice/source": "./src/seed.ts",
+      "types": "./dist/seed.d.ts",
+      "default": "./dist/seed.js"
+    }
+  },
+  "files": [
+    "dist",
+    "migrations"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "migrate": "tsx --env-file-if-exists=../../.env --conditions=@clinicvoice/source src/migrate.ts",
+    "seed": "tsx --env-file-if-exists=../../.env --conditions=@clinicvoice/source src/seed.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@clinicvoice/shared": "workspace:*",
+    "kysely": "^0.29.6",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1"
+  }
+}

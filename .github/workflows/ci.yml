@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: clinicvoice_owner
+          POSTGRES_PASSWORD: owner_ci_password
+          POSTGRES_DB: clinicvoice
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U clinicvoice_owner -d clinicvoice"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      TEST_DATABASE_MIGRATION_URL: postgres://clinicvoice_owner:owner_ci_password@localhost:5432/clinicvoice
+      TEST_DATABASE_URL: postgres://clinicvoice_app:app_ci_password@localhost:5432/clinicvoice
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Create app login role
+        run: |
+          PGPASSWORD=owner_ci_password psql -h localhost -U clinicvoice_owner -d clinicvoice -c "
+            CREATE ROLE app_role NOLOGIN;
+            CREATE ROLE clinicvoice_app LOGIN PASSWORD 'app_ci_password' IN ROLE app_role;"
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+
+  # Scripted conversations against the real model run on main only (cost and flakiness);
+  # each script must pass 3 of 3 runs. Wired up in milestone 3.

@@ -1,0 +1,8 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "customConditions": ["@clinicvoice/source"],
+    "outDir": "dist"
+  },
+  "include": ["src", "test"]
+}

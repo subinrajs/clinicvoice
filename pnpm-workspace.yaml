@@ -1,0 +1,7 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Packages allowed to run install scripts (pnpm blocks them by default).
+allowBuilds:
+  esbuild: true

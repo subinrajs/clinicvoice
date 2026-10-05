@@ -1,0 +1,41 @@
+:root {
+  font-family: system-ui, sans-serif;
+  color: #1f2328;
+  background: #f6f7f9;
+}
+body {
+  margin: 0;
+}
+.shell header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  background: #fff;
+  border-bottom: 1px solid #e3e5e8;
+}
+.shell h1 {
+  font-size: 18px;
+  margin: 0;
+}
+.shell nav {
+  display: flex;
+  gap: 16px;
+  padding: 12px 24px;
+  color: #57606a;
+}
+.shell main {
+  padding: 24px;
+}
+.status {
+  font-size: 13px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #eaeef2;
+}
+.status-ok {
+  background: #dafbe1;
+}
+.status-down {
+  background: #ffebe9;
+}

@@ -1,0 +1,62 @@
+{
+  "version": "screening-rules.v1",
+  "description": "MRI safety pre-screening. Any 'yes' or 'unsure' on a flagged question sets needs_review. The agent can never set 'clear'; only a technologist can.",
+  "questions": [
+    {
+      "id": "pacemaker",
+      "flag": true,
+      "en": "Do you have a pacemaker or defibrillator?",
+      "fr": "Avez-vous un stimulateur cardiaque ou un défibrillateur?"
+    },
+    {
+      "id": "neurostimulator",
+      "flag": true,
+      "en": "Do you have a neurostimulator, cochlear implant or any implanted pump?",
+      "fr": "Avez-vous un neurostimulateur, un implant cochléaire ou une pompe implantée?"
+    },
+    {
+      "id": "aneurysm_clip",
+      "flag": true,
+      "en": "Have you ever had surgery on your brain or heart, such as an aneurysm clip or heart valve?",
+      "fr": "Avez-vous déjà été opéré au cerveau ou au cœur, par exemple un clip d'anévrisme ou une valve cardiaque?"
+    },
+    {
+      "id": "metal_fragments",
+      "flag": true,
+      "en": "Have you ever had metal in your eyes, or worked with metal grinding or welding?",
+      "fr": "Avez-vous déjà eu du métal dans les yeux, ou travaillé dans le meulage ou la soudure?"
+    },
+    {
+      "id": "implants_other",
+      "flag": true,
+      "en": "Do you have any other implants, such as joint replacements, plates, screws or stents?",
+      "fr": "Avez-vous d'autres implants, comme une prothèse articulaire, des plaques, des vis ou des stents?"
+    },
+    {
+      "id": "pregnant",
+      "flag": true,
+      "en": "Is there any chance you are pregnant?",
+      "fr": "Y a-t-il une possibilité que vous soyez enceinte?"
+    },
+    {
+      "id": "kidney",
+      "flag": true,
+      "contrastOnly": true,
+      "en": "Do you have any kidney problems?",
+      "fr": "Avez-vous des problèmes rénaux?"
+    },
+    {
+      "id": "contrast_allergy",
+      "flag": true,
+      "contrastOnly": true,
+      "en": "Have you ever had a reaction to contrast dye?",
+      "fr": "Avez-vous déjà eu une réaction à un produit de contraste?"
+    },
+    {
+      "id": "claustrophobia",
+      "flag": false,
+      "en": "Are you uncomfortable in small spaces?",
+      "fr": "Êtes-vous mal à l'aise dans les espaces restreints?"
+    }
+  ]
+}
