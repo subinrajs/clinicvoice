@@ -1,6 +1,6 @@
 # ADR 0001: Port the existing ConversationRelay loop instead of building a new voice stack
 
-- Status: accepted
+- Status: accepted (LLM provider changed to OpenAI in [ADR 0004](0004-openai-as-llm-provider.md))
 - Date: 2026-10-05
 
 ## Context

@@ -4,19 +4,29 @@ import { findAppointments } from "./findAppointments.js";
 import { getClinicInfo } from "./getClinicInfo.js";
 import { proposeAction } from "./proposeAction.js";
 import { verifyIdentity } from "./verifyIdentity.js";
+import { bookSlot, cancelAppointment, holdSlot, searchSlots } from "./scheduling.js";
+import { recordScreeningAnswer } from "./screening.js";
+import { sendPrepInstructions } from "./sendPrepInstructions.js";
+import { transferToStaff } from "./transferToStaff.js";
 
-/**
- * Every tool the voice agent can call. Later milestones add search_slots, hold_slot, book_slot,
- * cancel_appointment, record_screening_answer, send_prep_instructions and transfer_to_staff.
- */
+/** Every tool the voice agent can call, in a fixed order so the provider-side prompt cache holds. */
+export const ALL_TOOLS = [
+  getClinicInfo,
+  verifyIdentity,
+  findAppointments,
+  searchSlots,
+  holdSlot,
+  proposeAction,
+  bookSlot,
+  cancelAppointment,
+  recordScreeningAnswer,
+  sendPrepInstructions,
+  createTask,
+  transferToStaff,
+] as unknown as readonly ToolDefinition[];
+
 export function createToolRegistry(
-  tools: readonly ToolDefinition[] = [
-    getClinicInfo,
-    verifyIdentity,
-    findAppointments,
-    proposeAction,
-    createTask,
-  ] as unknown as ToolDefinition[],
+  tools: readonly ToolDefinition[] = ALL_TOOLS,
 ): ReadonlyMap<string, ToolDefinition> {
   const registry = new Map<string, ToolDefinition>();
   for (const tool of tools) {

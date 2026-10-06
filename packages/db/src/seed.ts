@@ -5,9 +5,10 @@
  * Destructive: truncates every operational table. Refuses to run in production unless
  * SEED_ALLOW_RESET=1 is set (used by the nightly demo reset).
  */
-import { fileURLToPath } from "node:url";
+import { isEntrypoint } from "./entrypoint.js";
 import { sql } from "kysely";
 import { createDb, type Db } from "./client.js";
+import { seedDemoActivity } from "./demoActivity.js";
 import { hashPassword } from "./password.js";
 import {
   DEMO_PATIENTS,
@@ -108,13 +109,18 @@ function localDay(offsetDays: number): {
 async function truncateAll(db: Db): Promise<void> {
   // audit_log is truncated only by the owner role, which is what the seed runs as.
   await sql`
-    TRUNCATE audit_log, messages, prep_templates, tasks, screenings, identity_failures,
+    TRUNCATE jobs, llm_usage, audit_log, messages, prep_templates, tasks, screenings, identity_failures,
       call_turns, calls, appointments, slots, requisitions, patients, staff_users, sites
     RESTART IDENTITY CASCADE
   `.execute(db);
 }
 
-export async function seed(db: Db): Promise<Record<string, number>> {
+export interface SeedOptions {
+  /** Also add a day of demo calls, screenings and tasks so the dashboard has a story to show. */
+  demoActivity?: boolean;
+}
+
+export async function seed(db: Db, options: SeedOptions = {}): Promise<Record<string, number>> {
   const rng = createRng(20261005);
 
   return db.transaction().execute(async (trx) => {
@@ -274,7 +280,9 @@ export async function seed(db: Db): Promise<Record<string, number>> {
       ])
       .execute();
 
+    const demo = options.demoActivity ? await seedDemoActivity(trx) : {};
     return {
+      ...demo,
       sites: sites.length,
       patients: patients.length,
       slots: slots.length,
@@ -285,8 +293,7 @@ export async function seed(db: Db): Promise<Record<string, number>> {
   });
 }
 
-const isEntrypoint = process.argv[1] === fileURLToPath(import.meta.url);
-if (isEntrypoint) {
+if (isEntrypoint(import.meta.url)) {
   const url = process.env.DATABASE_MIGRATION_URL;
   if (!url) {
     console.error("DATABASE_MIGRATION_URL is not set");
@@ -297,7 +304,9 @@ if (isEntrypoint) {
     process.exit(1);
   }
   const db = createDb({ connectionString: url, maxConnections: 2 });
-  seed(db)
+  // `--demo` (or SEED_DEMO=1) adds the demo activity layer.
+  const demoActivity = process.argv.includes("--demo") || process.env.SEED_DEMO === "1";
+  seed(db, { demoActivity })
     .then((counts) => console.log("Seeded:", counts))
     .catch((error: unknown) => {
       console.error(error);

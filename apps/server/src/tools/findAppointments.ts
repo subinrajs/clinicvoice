@@ -36,6 +36,7 @@ export const findAppointments = defineTool({
       appointments: appointments.map((a) => ({
         ref: registerRef(session, "APPT", a.id),
         exam: examLabel(a.examCode, session.language),
+        modality: a.modality,
         site: a.siteName,
         when: speakableDateTime(a.startsAt, ctx.timeZone, session.language),
       })),

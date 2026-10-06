@@ -18,7 +18,8 @@
     "test": "pnpm -r test",
     "db:up": "docker compose up -d postgres",
     "db:migrate": "pnpm --filter @clinicvoice/db migrate",
-    "seed": "pnpm --filter @clinicvoice/db seed"
+    "seed": "pnpm --filter @clinicvoice/db seed",
+    "seed:demo": "pnpm --filter @clinicvoice/db seed:demo"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

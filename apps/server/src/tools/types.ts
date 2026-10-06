@@ -1,7 +1,12 @@
 import type { ToolErrorCode } from "@clinicvoice/shared";
 import type { z } from "zod";
 import type { Logger } from "../lib/logger.js";
+import type { JobQueue } from "../jobs/jobQueue.js";
+import type { MessagingPort } from "../messaging/messagingRepository.js";
+import type { SmsSender } from "../messaging/smsSender.js";
 import type { ClinicRepository } from "../repositories/clinicRepository.js";
+import type { SchedulingPort } from "../repositories/risRepository.js";
+import type { ScreeningPort } from "../repositories/screeningRepository.js";
 import type { AuditWriter } from "../repositories/auditRepository.js";
 import type { CallSession } from "../session/callSession.js";
 
@@ -16,7 +21,14 @@ export type ToolResult<T = unknown> = { ok: true; data: T } | { ok: false; error
 export interface ToolContext {
   session: CallSession;
   repo: ClinicRepository;
+  scheduling: SchedulingPort;
+  screening: ScreeningPort;
+  messaging: MessagingPort;
+  sms: SmsSender;
+  jobs: JobQueue;
   audit: AuditWriter;
+  /** True when a staff line is configured for warm transfer; otherwise transfers become callbacks. */
+  transferAvailable: boolean;
   logger: Logger;
   timeZone: string;
   now: () => Date;

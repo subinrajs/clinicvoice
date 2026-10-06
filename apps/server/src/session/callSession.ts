@@ -1,5 +1,5 @@
-import type Anthropic from "@anthropic-ai/sdk";
 import type { Language } from "@clinicvoice/shared";
+import type { ConversationMessage } from "../llm/types.js";
 
 export interface PendingAction {
   /** The write tool the caller is being asked to approve, e.g. "book_slot". */
@@ -21,7 +21,7 @@ export interface CallSession {
   readonly callSid: string;
   readonly fromHash: string | null;
   language: Language;
-  history: Anthropic.MessageParam[];
+  history: ConversationMessage[];
   turnSeq: number;
 
   verifiedPatientId: string | null;
@@ -32,6 +32,8 @@ export interface CallSession {
   pendingAction: PendingAction | null;
   heldSlotId: string | null;
   escalated: boolean;
+  /** Set by transfer_to_staff; the relay hands the call to staff once the current reply is spoken. */
+  handoff: { reason: string; summary: string } | null;
 
   /** Short ref spoken/seen by the model -> internal id. */
   refs: Map<string, string>;
@@ -57,6 +59,7 @@ export function createCallSession(init: {
     pendingAction: null,
     heldSlotId: null,
     escalated: false,
+    handoff: null,
     refs: new Map(),
   };
 }

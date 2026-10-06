@@ -1,11 +1,11 @@
 # ADR 0003: Derive conversation state from session facts; keep the prompt and tool list static
 
-- Status: accepted
+- Status: accepted (caching mechanics amended by [ADR 0004](0004-openai-as-llm-provider.md))
 - Date: 2026-10-05
 
 ## Context
 
-The plan describes an 8-state machine and a system prompt regenerated every turn with the allowed tools. A stored state can drift from what the guards check, and changing the prompt or tool list every turn defeats prompt caching. Claude's first token is already the largest slice of the latency budget.
+The plan describes an 8-state machine and a system prompt regenerated every turn with the allowed tools. A stored state can drift from what the guards check, and changing the prompt or tool list every turn defeats prompt caching. The model's first token is already the largest slice of the latency budget.
 
 ## Decision
 

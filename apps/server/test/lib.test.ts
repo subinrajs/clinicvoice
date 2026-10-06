@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { trimHistory } from "../src/agent/history.js";
+import type { ConversationMessage } from "../src/llm/types.js";
 import { isClinicalAdvice, SentenceBuffer } from "../src/agent/outputFilter.js";
 import { surnamesMatch } from "../src/lib/fuzzyName.js";
 import { hashPhone } from "../src/lib/phone.js";
@@ -90,19 +91,13 @@ describe("output filter", () => {
 
 describe("trimHistory", () => {
   it("never starts on an orphaned tool result", () => {
-    const history = [
-      { role: "user" as const, content: "one" },
-      {
-        role: "assistant" as const,
-        content: [{ type: "tool_use" as const, id: "t", name: "x", input: {} }],
-      },
-      {
-        role: "user" as const,
-        content: [{ type: "tool_result" as const, tool_use_id: "t", content: "{}" }],
-      },
-      { role: "assistant" as const, content: "ok" },
-      { role: "user" as const, content: "two" },
-      { role: "assistant" as const, content: "fine" },
+    const history: ConversationMessage[] = [
+      { role: "user", content: "one" },
+      { role: "assistant", content: "", toolCalls: [{ id: "t", name: "x", input: {} }] },
+      { role: "tool", toolCallId: "t", content: "{}" },
+      { role: "assistant", content: "ok" },
+      { role: "user", content: "two" },
+      { role: "assistant", content: "fine" },
     ];
     const trimmed = trimHistory(history, 4);
     expect(trimmed[0]).toEqual({ role: "user", content: "two" });
@@ -120,10 +115,14 @@ describe("hashPhone", () => {
 
 describe("TwiML", () => {
   it("connects to the relay with the AI disclosure and both languages", () => {
-    const xml = buildConversationRelayTwiml({ wsUrl: "wss://example.test/ws" });
+    const xml = buildConversationRelayTwiml({
+      wsUrl: "wss://example.test/ws",
+      actionUrl: "https://example.test/voice/relay-ended",
+    });
     expect(xml).toContain('url="wss://example.test/ws"');
     expect(xml).toContain("virtual assistant");
     expect(xml).toContain("may be recorded");
     expect(xml).toContain('code="fr-CA"');
+    expect(xml).toContain('<Connect action="https://example.test/voice/relay-ended">');
   });
 });

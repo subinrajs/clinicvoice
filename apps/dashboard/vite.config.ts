@@ -6,7 +6,8 @@ export default defineConfig({
   resolve: { conditions: ["@clinicvoice/source"] },
   server: {
     port: 5173,
-    // Dev only: the API runs on :3000. In production the dashboard calls VITE_API_BASE_URL.
-    proxy: { "/api": "http://localhost:3000", "/healthz": "http://localhost:3000" },
+    // Dev only: same-origin /api, like the Vercel rewrite in production, so the session cookie works.
+    // Override with API_PROXY_TARGET when the server runs on another port.
+    proxy: { "/api": process.env.API_PROXY_TARGET ?? "http://localhost:3000" },
   },
 });

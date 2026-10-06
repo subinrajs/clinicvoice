@@ -158,6 +158,7 @@ describe("find_appointments", () => {
           {
             ref: "APPT1",
             exam: "MRI of the knee",
+            modality: "MRI",
             site: "Lakeshore MRI & CT Mississauga",
             when: "Thursday, October 15th at 2:40 in the afternoon",
           },

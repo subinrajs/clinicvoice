@@ -1,0 +1,13 @@
+id: "04"
+description: Caller starts a cancellation, then says "actually no" at confirmation
+caller:
+  - "I'd like to cancel my MRI."
+  - "Santos, born March 12, 1984, last four 0121."
+  - "Yes, that one. I have a scheduling conflict."
+  - "Actually, no. Please keep it."
+  - "No, that's all. Thank you."
+expect:
+  verified: true
+  tools_called: [propose_action]
+  db:
+    cancelled_appointments: 0

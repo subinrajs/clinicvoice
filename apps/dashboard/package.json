@@ -11,8 +11,11 @@
     "test": "echo \"no tests yet\""
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.104.1",
+    "lucide-react": "^1.52.0",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "react-router-dom": "^7.18.4"
   },
   "devDependencies": {
     "@types/react": "^19.3.0",

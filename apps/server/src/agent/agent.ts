@@ -1,6 +1,6 @@
-import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import type { Logger } from "../lib/logger.js";
+import type { ChatModel, ToolSpec } from "../llm/types.js";
 import type { CallSession } from "../session/callSession.js";
 import { classifyConfirmation } from "../session/confirmation.js";
 import { allowedTools, deriveState } from "../session/state.js";
@@ -23,8 +23,7 @@ export interface TurnRecord {
 }
 
 export interface AgentDeps {
-  client: Pick<Anthropic, "messages">;
-  model: string;
+  model: ChatModel;
   systemPrompt: string;
   tools: ReadonlyMap<string, ToolDefinition>;
   logger: Logger;
@@ -40,35 +39,32 @@ export interface TurnMetrics {
   totalMs: number;
   toolCalls: number;
   filterHit: boolean;
+  /** Input tokens served from the provider's prompt cache, for latency tuning. */
+  cachedInputTokens: number;
+  inputTokens: number;
+  outputTokens: number;
 }
 
-const anthropicToolCache = new WeakMap<ReadonlyMap<string, ToolDefinition>, Anthropic.Tool[]>();
+const toolSpecCache = new WeakMap<ReadonlyMap<string, ToolDefinition>, ToolSpec[]>();
 
-/** Converts the registry into Anthropic tool definitions once; the list is static so it caches. */
-export function toAnthropicTools(tools: ReadonlyMap<string, ToolDefinition>): Anthropic.Tool[] {
-  const cached = anthropicToolCache.get(tools);
+/** Converts the registry into tool specs once; the list is static so the provider can cache it. */
+export function toToolSpecs(tools: ReadonlyMap<string, ToolDefinition>): ToolSpec[] {
+  const cached = toolSpecCache.get(tools);
   if (cached) return cached;
-  const list = [...tools.values()].map((tool) => {
-    const { $schema: _schemaUri, ...schema } = z.toJSONSchema(tool.input) as Record<
+  const specs = [...tools.values()].map((tool) => {
+    const { $schema: _schemaUri, ...parameters } = z.toJSONSchema(tool.input) as Record<
       string,
       unknown
     >;
-    return {
-      name: tool.name,
-      description: tool.description,
-      input_schema: schema as Anthropic.Tool.InputSchema,
-    } satisfies Anthropic.Tool;
+    return { name: tool.name, description: tool.description, parameters };
   });
-  // A cache breakpoint on the last tool caches the whole tool list.
-  const last = list.at(-1);
-  if (last) Object.assign(last, { cache_control: { type: "ephemeral" } });
-  anthropicToolCache.set(tools, list);
-  return list;
+  toolSpecCache.set(tools, specs);
+  return specs;
 }
 
 /**
  * Applies the deterministic confirmation check to the caller's words before the model sees them,
- * and returns a note for the per-turn system block describing what happened.
+ * and returns a note for the per-turn context describing what happened.
  */
 export function applyConfirmation(session: CallSession, callerText: string): string | null {
   const pending = session.pendingAction;
@@ -86,7 +82,7 @@ export function applyConfirmation(session: CallSession, callerText: string): str
   }
 }
 
-function stateBlock(session: CallSession, note: string | null): string {
+export function turnContext(session: CallSession, note: string | null): string {
   const lines = [
     `Current state: ${deriveState(session)}.`,
     `Tools you may call now: ${allowedTools(session).join(", ")}.`,
@@ -101,7 +97,7 @@ function stateBlock(session: CallSession, note: string | null): string {
 }
 
 /**
- * Runs one caller turn: confirmation check, then the streaming Claude tool loop. Spoken text is
+ * Runs one caller turn: confirmation check, then the streaming model tool loop. Spoken text is
  * released sentence by sentence through the clinical-advice filter via `speak`.
  */
 export async function runAgentTurn(
@@ -115,12 +111,15 @@ export async function runAgentTurn(
   let firstSpeechMs: number | null = null;
   let filterHit = false;
   let toolCalls = 0;
+  let inputTokens = 0;
+  let cachedInputTokens = 0;
+  let outputTokens = 0;
 
   const note = applyConfirmation(session, callerText);
   deps.recordTurn(session, { role: "caller", text: callerText, state: deriveState(session) });
   session.history.push({ role: "user", content: callerText });
 
-  const anthropicTools = toAnthropicTools(deps.tools);
+  const tools = toToolSpecs(deps.tools);
   const ctx: ToolContext = { ...deps.toolContext(session), tools: deps.tools };
 
   const release = (sentence: string) => {
@@ -145,69 +144,55 @@ export async function runAgentTurn(
     session.history = trimHistory(session.history);
     const buffer = new SentenceBuffer();
 
-    const stream = deps.client.messages.stream(
-      {
-        model: deps.model,
-        max_tokens: MAX_REPLY_TOKENS,
-        system: [
-          { type: "text", text: deps.systemPrompt, cache_control: { type: "ephemeral" } },
-          { type: "text", text: stateBlock(session, iteration === 0 ? note : null) },
-        ],
-        tools: anthropicTools,
-        messages: session.history,
-      },
-      { signal },
-    );
-    stream.on("text", (delta) => buffer.push(delta).forEach(release));
-
-    const message = await stream.finalMessage();
+    const result = await deps.model.streamTurn({
+      system: deps.systemPrompt,
+      tools,
+      history: session.history,
+      turnContext: turnContext(session, iteration === 0 ? note : null),
+      cacheKey: `call:${session.callId}`,
+      maxOutputTokens: MAX_REPLY_TOKENS,
+      ...(signal ? { signal } : {}),
+      onText: (delta) => buffer.push(delta).forEach(release),
+    });
     release(buffer.flush());
-    // If the filter fired, the model's own history must not keep the blocked wording either.
-    const content = filterHit
-      ? message.content.map((b) =>
-          b.type === "text" ? { ...b, text: ESCALATION_LINE[session.language] } : b,
-        )
-      : message.content;
-    session.history.push({ role: "assistant", content });
+    inputTokens += result.usage?.inputTokens ?? 0;
+    cachedInputTokens += result.usage?.cachedInputTokens ?? 0;
+    outputTokens += result.usage?.outputTokens ?? 0;
 
-    const spoken = message.content
-      .filter((b): b is Anthropic.TextBlock => b.type === "text")
-      .map((b) => b.text)
-      .join(" ")
-      .trim();
+    // If the filter fired, the model's own history must not keep the blocked wording either.
+    const spoken = filterHit ? ESCALATION_LINE[session.language] : result.text.trim();
+    session.history.push({
+      role: "assistant",
+      content: spoken,
+      ...(result.toolCalls.length ? { toolCalls: result.toolCalls } : {}),
+    });
     if (spoken) {
       deps.recordTurn(session, {
         role: "agent",
-        text: filterHit ? ESCALATION_LINE[session.language] : spoken,
+        text: spoken,
         state: deriveState(session),
         ...(firstSpeechMs !== null ? { latencyMs: firstSpeechMs } : {}),
       });
     }
 
-    if (message.stop_reason !== "tool_use") break;
+    if (result.toolCalls.length === 0) break;
 
-    const toolUses = message.content.filter(
-      (b): b is Anthropic.ToolUseBlock => b.type === "tool_use",
-    );
-    const results: Anthropic.ToolResultBlockParam[] = [];
-    for (const block of toolUses) {
+    for (const call of result.toolCalls) {
       toolCalls++;
-      const result = await executeTool(deps.tools, block.name, block.input, ctx);
+      const outcome = await executeTool(deps.tools, call.name, call.input, ctx);
       deps.recordTurn(session, {
         role: "tool",
-        toolName: block.name,
-        toolInput: block.input,
-        toolResult: result,
+        toolName: call.name,
+        toolInput: call.input,
+        toolResult: outcome,
         state: deriveState(session),
       });
-      results.push({
-        type: "tool_result",
-        tool_use_id: block.id,
-        content: JSON.stringify(result.ok ? result.data : { error: result.error }),
-        ...(result.ok ? {} : { is_error: true }),
+      session.history.push({
+        role: "tool",
+        toolCallId: call.id,
+        content: JSON.stringify(outcome.ok ? outcome.data : { error: outcome.error }),
       });
     }
-    session.history.push({ role: "user", content: results });
 
     if (iteration === MAX_TOOL_ITERATIONS - 1) {
       // The model is looping (usually on guard errors). Hand off rather than keep the caller waiting.
@@ -216,7 +201,7 @@ export async function runAgentTurn(
           ? "Je suis désolée, j'ai du mal à terminer cela. Un membre de l'équipe vous rappellera."
           : "Sorry, I'm having trouble completing that. I'll have a team member call you back.";
       release(apology);
-      // Close the exchange with an assistant message so history stays user/assistant alternating.
+      // Close the exchange with an assistant message so every tool result is answered.
       session.history.push({ role: "assistant", content: apology });
       await executeTool(
         deps.tools,
@@ -232,5 +217,8 @@ export async function runAgentTurn(
     totalMs: Math.round(performance.now() - startedAt),
     toolCalls,
     filterHit,
+    inputTokens,
+    cachedInputTokens,
+    outputTokens,
   };
 }

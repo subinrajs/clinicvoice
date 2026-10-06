@@ -2,12 +2,17 @@ import type { Db } from "@clinicvoice/db";
 import type { Logger } from "../lib/logger.js";
 import type { TurnRecord } from "../agent/agent.js";
 
+export interface CallEnd {
+  medianLatencyMs: number | null;
+  flagged: boolean;
+  endReason: "hangup" | "transfer" | "silence" | "rejected" | "error";
+}
+
 export interface CallRepository {
   startCall(call: { twilioSid: string; fromHash: string | null }): Promise<{ id: string }>;
-  endCall(
-    callId: string,
-    outcome: { medianLatencyMs: number | null; flagged: boolean },
-  ): Promise<void>;
+  endCall(callId: string, end: CallEnd): Promise<void>;
+  /** Calls started from this caller hash since `since`, for the per-number rate limit. */
+  countRecentCallsFrom(fromHash: string, since: Date): Promise<number>;
   /** Fire-and-forget: queued so persistence never adds latency to a live turn. */
   recordTurn(callId: string, seq: number, turn: TurnRecord): void;
   /** Resolves when all queued turn writes have settled (used on hang-up and in tests). */
@@ -31,17 +36,28 @@ export class PostgresCallRepository implements CallRepository {
       .executeTakeFirstOrThrow();
   }
 
-  async endCall(callId: string, outcome: { medianLatencyMs: number | null; flagged: boolean }) {
+  async endCall(callId: string, end: CallEnd) {
     await this.drain();
     await this.db
       .updateTable("calls")
       .set({
         ended_at: new Date(),
-        median_latency_ms: outcome.medianLatencyMs,
-        flagged: outcome.flagged,
+        median_latency_ms: end.medianLatencyMs,
+        flagged: end.flagged,
+        end_reason: end.endReason,
       })
       .where("id", "=", callId)
       .execute();
+  }
+
+  async countRecentCallsFrom(fromHash: string, since: Date) {
+    const row = await this.db
+      .selectFrom("calls")
+      .select((eb) => eb.fn.countAll<string>().as("count"))
+      .where("from_hash", "=", fromHash)
+      .where("started_at", ">=", since)
+      .executeTakeFirstOrThrow();
+    return Number(row.count);
   }
 
   recordTurn(callId: string, seq: number, turn: TurnRecord): void {

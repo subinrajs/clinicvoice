@@ -1,0 +1,18 @@
+id: "06"
+description: Screening with "not sure, I had knee surgery" keeps the exact words and needs review
+caller:
+  - "Hi, I need to answer the MRI screening questions."
+  - "Santos, March 12, 1984, phone ending 0121."
+  - "Sure, go ahead."
+  - "No."
+  - "No."
+  - "No."
+  - "No."
+  - "I'm not sure, I had knee surgery a few years ago."
+  - "No."
+  - "No."
+expect:
+  verified: true
+  db:
+    screening_status: needs_review
+    screening_words_contain: "knee surgery"

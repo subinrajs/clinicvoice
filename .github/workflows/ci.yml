@@ -4,13 +4,21 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    # Nightly scripted-conversation run against the real model, to catch model drift.
+    - cron: "0 9 * * *"
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
+
+env:
+  TEST_DATABASE_MIGRATION_URL: postgres://clinicvoice_owner:owner_ci_password@localhost:5432/clinicvoice
+  TEST_DATABASE_URL: postgres://clinicvoice_app:app_ci_password@localhost:5432/clinicvoice
 
 jobs:
   verify:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -23,9 +31,6 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U clinicvoice_owner -d clinicvoice"
           --health-interval 5s --health-timeout 3s --health-retries 10
-    env:
-      TEST_DATABASE_MIGRATION_URL: postgres://clinicvoice_owner:owner_ci_password@localhost:5432/clinicvoice
-      TEST_DATABASE_URL: postgres://clinicvoice_app:app_ci_password@localhost:5432/clinicvoice
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -45,5 +50,56 @@ jobs:
       - run: pnpm test
       - run: pnpm build
 
-  # Scripted conversations against the real model run on main only (cost and flakiness);
-  # each script must pass 3 of 3 runs. Wired up in milestone 3.
+  # Real-model scripted conversations: on main and nightly only (cost and flakiness). Each of the
+  # 10 scripts must pass 3 of 3 runs. Skipped when the OPENAI_API_KEY secret is not configured.
+  conversations:
+    if: github.event_name == 'schedule' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: clinicvoice_owner
+          POSTGRES_PASSWORD: owner_ci_password
+          POSTGRES_DB: clinicvoice
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U clinicvoice_owner -d clinicvoice"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      DATABASE_URL: postgres://clinicvoice_app:app_ci_password@localhost:5432/clinicvoice
+      DATABASE_MIGRATION_URL: postgres://clinicvoice_owner:owner_ci_password@localhost:5432/clinicvoice
+      OPENAI_LIVE_MODEL: gpt-5.4-mini
+      OPENAI_LIVE_REASONING_EFFORT: none
+      LOG_LEVEL: warn
+    steps:
+      - name: Check for API key
+        id: key
+        run: echo "present=${{ secrets.OPENAI_API_KEY != '' }}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        if: steps.key.outputs.present == 'true'
+      - uses: pnpm/action-setup@v4
+        if: steps.key.outputs.present == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.key.outputs.present == 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - if: steps.key.outputs.present == 'true'
+        run: pnpm install --frozen-lockfile
+      - name: Create app login role and migrate
+        if: steps.key.outputs.present == 'true'
+        run: |
+          PGPASSWORD=owner_ci_password psql -h localhost -U clinicvoice_owner -d clinicvoice -c "
+            CREATE ROLE app_role NOLOGIN;
+            CREATE ROLE clinicvoice_app LOGIN PASSWORD 'app_ci_password' IN ROLE app_role;"
+          pnpm db:migrate
+      - name: Scripted conversations (3 runs each, graded)
+        if: steps.key.outputs.present == 'true'
+        run: pnpm --filter @clinicvoice/server conversations --runs 3 --grade
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.key.outputs.present == 'true'
+        with:
+          name: conversation-report
+          path: tests/conversations/report.*

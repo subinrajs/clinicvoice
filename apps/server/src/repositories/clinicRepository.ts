@@ -48,6 +48,7 @@ export interface ClinicRepository {
     patientId: string | null;
     reason: string;
     assignedRole: StaffRole;
+    screeningId?: string;
   }): Promise<{ id: string }>;
 }
 
@@ -152,8 +153,9 @@ export class PostgresClinicRepository implements ClinicRepository {
     patientId: string | null;
     reason: string;
     assignedRole: StaffRole;
+    screeningId?: string;
   }) {
-    return this.db
+    const inserted = await this.db
       .insertInto("tasks")
       .values({
         type: task.type,
@@ -161,8 +163,18 @@ export class PostgresClinicRepository implements ClinicRepository {
         patient_id: task.patientId,
         reason: task.reason,
         assigned_role: task.assignedRole,
+        screening_id: task.screeningId ?? null,
       })
+      // One review task per screening (unique partial index); repeats return the existing task.
+      .onConflict((oc) => oc.column("screening_id").where("type", "=", "review").doNothing())
       .returning("id")
+      .executeTakeFirst();
+    if (inserted) return inserted;
+    return this.db
+      .selectFrom("tasks")
+      .select("id")
+      .where("screening_id", "=", task.screeningId as string)
+      .where("type", "=", "review")
       .executeTakeFirstOrThrow();
   }
 }

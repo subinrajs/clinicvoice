@@ -31,7 +31,15 @@ export const proposeAction = defineTool({
       );
     }
     const args = parsed.data as Record<string, unknown>;
-    const summary = await target.describe(args, ctx);
+    let summary: string;
+    try {
+      summary = await target.describe(args, ctx);
+    } catch {
+      return fail(
+        ToolErrorCode.UNKNOWN_REF,
+        "One of the refs is not valid in this call. Look it up again first.",
+      );
+    }
     ctx.session.pendingAction = { tool: input.tool, args, summary, confirmed: false };
     return ok({
       read_back: summary,

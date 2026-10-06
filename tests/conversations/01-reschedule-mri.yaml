@@ -1,0 +1,16 @@
+id: "01"
+description: Reschedule MRI after successful verification
+caller:
+  - "Hi, I need to move my MRI appointment to a different day."
+  - "My last name is Santos, date of birth March 12, 1984, and my phone ends in 0121."
+  - "Yes, that's the one. What else do you have?"
+  - "The first time you mentioned works for me."
+  - "Yes."
+  - "No, that's everything. Thanks."
+expect:
+  verified: true
+  tools_called: [verify_identity, find_appointments, search_slots, hold_slot, propose_action]
+  tools_succeeded: [book_slot]
+  db:
+    voice_bookings: 1
+    cancelled_appointments: 1

@@ -1,0 +1,15 @@
+id: "09"
+description: French-speaking caller gets French replies and a French SMS
+caller:
+  - "Bonjour, en français s'il vous plaît. Je voudrais recevoir les instructions de préparation pour mon IRM."
+  - "Tremblay, né le 2 novembre 1979, et mon numéro se termine par 0134."
+  - "Oui, en français s'il vous plaît."
+  - "Oui."
+  - "Non merci, c'est tout."
+expect:
+  verified: true
+  final_language: fr
+  spoken_matching: ["(merci|bonjour|d'accord|instructions)"]
+  db:
+    sms_sent: 1
+    sms_language: fr

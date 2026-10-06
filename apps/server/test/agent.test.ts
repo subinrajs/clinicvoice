@@ -3,38 +3,30 @@ import { runAgentTurn, type AgentDeps, type TurnRecord } from "../src/agent/agen
 import { createCallSession } from "../src/session/callSession.js";
 import { createToolRegistry } from "../src/tools/registry.js";
 import {
-  fakeAnthropic,
-  FakeAuditWriter,
-  FakeClinicRepository,
+  baseContext,
+  createFakes,
+  fakeChatModel,
   silentLogger,
   type ScriptedReply,
 } from "./helpers.js";
 
 function setup(replies: ScriptedReply[]) {
-  const { client, requests } = fakeAnthropic(replies);
-  const repo = new FakeClinicRepository();
+  const { model, requests } = fakeChatModel(replies);
+  const fakes = createFakes();
+  const repo = fakes.repo;
   const session = createCallSession({ callId: "call-1", callSid: "CA1", fromHash: null });
   const turns: TurnRecord[] = [];
   const spoken: string[] = [];
   const deps: AgentDeps = {
-    client,
-    model: "claude-haiku-4-5",
+    model,
     systemPrompt: "STATIC PROMPT",
     tools: createToolRegistry(),
     logger: silentLogger,
-    toolContext: (s) => ({
-      session: s,
-      repo,
-      audit: new FakeAuditWriter(),
-      logger: silentLogger,
-      timeZone: "America/Toronto",
-      now: () => new Date("2026-10-05T14:00:00Z"),
-      requestId: "r",
-    }),
+    toolContext: (s) => baseContext(s, fakes),
     recordTurn: (_s, turn) => turns.push(turn),
   };
   const run = (text: string) => runAgentTurn(deps, session, text, (t) => spoken.push(t));
-  return { run, session, requests, turns, spoken, repo };
+  return { run, session, requests, turns, spoken, repo, fakes };
 }
 
 describe("runAgentTurn", () => {
@@ -60,22 +52,36 @@ describe("runAgentTurn", () => {
     expect(session.verifiedPatientId).toBe("p-maria");
     expect(metrics.toolCalls).toBe(1);
     expect(metrics.firstSpeechMs).not.toBeNull();
-    // Second request carries the tool result and the updated state.
+
+    // Second request carries the assistant tool call, its result, and the updated state.
     const second = requests[1]!;
-    const system = second.system as { text: string }[];
-    expect(system[1]!.text).toContain("Current state: handle_task");
+    expect(second.turnContext).toContain("Current state: handle_task");
+    expect(second.history.at(-2)).toMatchObject({
+      role: "assistant",
+      toolCalls: [{ id: "call_1_0", name: "verify_identity" }],
+    });
+    expect(second.history.at(-1)).toMatchObject({ role: "tool", toolCallId: "call_1_0" });
   });
 
-  it("keeps the cached prefix byte-identical across turns", async () => {
+  it("keeps the cacheable prefix stable across turns", async () => {
     const { run, requests } = setup([{ text: "Hello." }, { text: "Sure." }]);
     await run("hi");
     await run("parking?");
     const [a, b] = requests;
-    expect(JSON.stringify(a!.tools)).toBe(JSON.stringify(b!.tools));
-    expect((a!.system as { text: string }[])[0]).toEqual((b!.system as { text: string }[])[0]);
-    expect((a!.system as { cache_control?: unknown }[])[0]!.cache_control).toEqual({
-      type: "ephemeral",
-    });
+    expect(b!.system).toBe(a!.system);
+    expect(JSON.stringify(b!.tools)).toBe(JSON.stringify(a!.tools));
+    // Turn 2's history begins with exactly turn 1's history: per-turn state is not stored in it.
+    expect(b!.history.slice(0, a!.history.length)).toEqual(a!.history);
+    expect(JSON.stringify(b!.history)).not.toContain("Current state");
+    expect(b!.cacheKey).toBe("call:call-1");
+  });
+
+  it("reports prompt-cache usage for latency tuning", async () => {
+    const { run } = setup([
+      { text: "Hello.", usage: { inputTokens: 2000, cachedInputTokens: 1536, outputTokens: 5 } },
+    ]);
+    const metrics = await run("hi");
+    expect(metrics).toMatchObject({ inputTokens: 2000, cachedInputTokens: 1536 });
   });
 
   it("replaces clinical advice before it is spoken and scrubs it from history", async () => {
@@ -101,7 +107,7 @@ describe("runAgentTurn", () => {
     };
     await run("yes please");
     expect(session.pendingAction?.confirmed).toBe(true);
-    expect((requests[0]!.system as { text: string }[])[1]!.text).toContain("The caller CONFIRMED");
+    expect(requests[0]!.turnContext).toContain("The caller CONFIRMED");
   });
 
   it("clears the pending action when the caller says no", async () => {

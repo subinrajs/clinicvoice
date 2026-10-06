@@ -80,6 +80,7 @@ export interface CallsTable {
   summary: Json<unknown> | null;
   median_latency_ms: number | null;
   flagged: Generated<boolean>;
+  end_reason: string | null;
 }
 
 export interface CallTurnsTable {
@@ -134,7 +135,9 @@ export interface TasksTable {
   reason: string;
   status: Generated<string>;
   assigned_role: string | null;
+  screening_id: string | null;
   created_at: GeneratedTimestamp;
+  updated_at: GeneratedTimestamp;
 }
 
 export interface PrepTemplatesTable {
@@ -166,6 +169,31 @@ export interface AuditLogTable {
   request_id: string | null;
 }
 
+export interface JobsTable {
+  id: Generated<string>;
+  type: string;
+  payload: Json<unknown>;
+  status: Generated<"queued" | "running" | "done" | "failed">;
+  attempts: Generated<number>;
+  max_attempts: Generated<number>;
+  run_after: GeneratedTimestamp;
+  last_error: string | null;
+  dedupe_key: string | null;
+  created_at: GeneratedTimestamp;
+  updated_at: GeneratedTimestamp;
+}
+
+export interface LlmUsageTable {
+  id: Generated<string>;
+  at: GeneratedTimestamp;
+  call_id: string | null;
+  purpose: string;
+  model: string;
+  input_tokens: number;
+  cached_input_tokens: Generated<number>;
+  output_tokens: number;
+}
+
 export interface Database {
   sites: SitesTable;
   patients: PatientsTable;
@@ -181,6 +209,8 @@ export interface Database {
   prep_templates: PrepTemplatesTable;
   messages: MessagesTable;
   audit_log: AuditLogTable;
+  jobs: JobsTable;
+  llm_usage: LlmUsageTable;
 }
 
 export type Site = Selectable<SitesTable>;

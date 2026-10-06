@@ -1,0 +1,74 @@
+# Render blueprint: the voice/API server (long-lived, for WebSockets) and the nightly demo reset.
+# Secrets are marked sync: false and entered in the Render dashboard, never committed.
+services:
+  - type: web
+    name: clinicvoice-server
+    runtime: docker
+    dockerfilePath: apps/server/Dockerfile
+    dockerContext: .
+    plan: starter
+    region: ohio
+    healthCheckPath: /readyz
+    # Migrations run as the schema owner before each deploy goes live.
+    preDeployCommand: node node_modules/@clinicvoice/db/dist/migrate.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: info
+      - key: CLINIC_TIMEZONE
+        value: America/Toronto
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_MIGRATION_URL
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_LIVE_MODEL
+        value: gpt-5.4-mini
+      - key: OPENAI_LIVE_REASONING_EFFORT
+        value: none
+      - key: OPENAI_OFFLINE_MODEL
+        value: gpt-5.5
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_PHONE_NUMBER
+        sync: false
+      - key: STAFF_TRANSFER_NUMBER
+        sync: false
+      - key: SMS_MODE
+        value: twilio
+      - key: PHONE_HASH_KEY
+        generateValue: true
+      - key: RIS_API_KEY
+        generateValue: true
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: MAX_CONCURRENT_CALLS
+        value: "5"
+      - key: MAX_CALLS_PER_NUMBER_PER_HOUR
+        value: "6"
+      - key: DAILY_TOKEN_BUDGET
+        value: "2000000"
+
+  # Resets the public demo to a clean schedule every night (08:00 UTC = 3-4 AM Toronto).
+  - type: cron
+    name: clinicvoice-nightly-reset
+    runtime: docker
+    dockerfilePath: apps/server/Dockerfile
+    dockerContext: .
+    schedule: "0 8 * * *"
+    dockerCommand: node node_modules/@clinicvoice/db/dist/seed.js --demo
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SEED_ALLOW_RESET
+        value: "1"
+      - key: DATABASE_MIGRATION_URL
+        sync: false
+      - key: SEED_STAFF_PASSWORD
+        sync: false

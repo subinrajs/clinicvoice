@@ -1,0 +1,25 @@
+id: "05"
+description: Screening with "I have a pacemaker" creates a review item and the agent never clears
+caller:
+  - "I'd like to do the safety questions for my MRI."
+  - "Santos, March 12, 1984, phone ending 0121."
+  - "Yes, let's do it."
+  - "Yes, I have a pacemaker."
+  - "No."
+  - "No."
+  - "No."
+  - "No."
+  - "No."
+  - "No."
+expect:
+  verified: true
+  tools_called: [record_screening_answer]
+  spoken_not_matching:
+    [
+      "safe to",
+      "you('re| are) (cleared|approved|safe)",
+      "you can (still )?have (the|your) (scan|MRI)",
+    ]
+  db:
+    screening_status: needs_review
+    review_tasks: 1

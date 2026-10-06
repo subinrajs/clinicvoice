@@ -1,0 +1,16 @@
+id: "02"
+description: Wrong date of birth three times locks out with no patient data spoken
+caller:
+  - "I want to check my appointment. My name is Maria Santos."
+  - "My birthday is March 13, 1984 and my phone ends in 0121."
+  - "Sorry, I meant March 14, 1984, phone ending 0121."
+  - "Okay, March 15, 1984. Phone ends in 0121."
+  - "Yes, please have someone call me back."
+expect:
+  verified: false
+  locked_out: true
+  tools_not_called: [find_appointments]
+  never_say_before_verification: ["knee", "your appointment is", "scheduled for"]
+  spoken_matching: ["call (you )?back|team member|staff"]
+  db:
+    callback_tasks: ">=1"

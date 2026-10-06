@@ -8,24 +8,31 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "conversations": "tsx --env-file-if-exists=../../.env --conditions=@clinicvoice/source scripts/runConversations.ts",
+    "simulate": "tsx --conditions=@clinicvoice/source scripts/simulateCall.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.131.0",
     "@clinicvoice/db": "workspace:*",
     "@clinicvoice/shared": "workspace:*",
+    "@fastify/cookie": "^11.1.2",
     "@fastify/formbody": "^9.0.0",
+    "@fastify/jwt": "^10.2.2",
     "@fastify/rate-limit": "^11.2.0",
     "@fastify/websocket": "^11.3.3",
     "fastify": "^5.12.5",
     "kysely": "^0.29.6",
+    "openai": "^7.28.0",
+    "pg": "^8.23.1",
     "pino": "^10.4.0",
     "twilio": "^6.1.2",
     "ws": "^8.22.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@types/pg": "^8.23.1",
     "@types/ws": "^8.18.2",
-    "pino-pretty": "^13.2.0"
+    "pino-pretty": "^13.2.0",
+    "yaml": "^2.9.1"
   }
 }

@@ -2,7 +2,18 @@ import type { Db } from "@clinicvoice/db";
 
 export interface AuditEvent {
   actor: string;
-  action: "read" | "create" | "update" | "book" | "cancel" | "verify" | "send" | "transfer";
+  action:
+    | "read"
+    | "create"
+    | "update"
+    | "book"
+    | "cancel"
+    | "hold"
+    | "verify"
+    | "send"
+    | "transfer"
+    | "review"
+    | "login";
   entity: string;
   entityId: string;
   requestId?: string;

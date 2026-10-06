@@ -5,6 +5,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { isEntrypoint } from "./entrypoint.js";
 import pg from "pg";
 
 const MIGRATIONS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../migrations");
@@ -50,8 +51,7 @@ export async function migrate(connectionString: string): Promise<string[]> {
   return applied;
 }
 
-const isEntrypoint = process.argv[1] === fileURLToPath(import.meta.url);
-if (isEntrypoint) {
+if (isEntrypoint(import.meta.url)) {
   const url = process.env.DATABASE_MIGRATION_URL;
   if (!url) {
     console.error("DATABASE_MIGRATION_URL is not set");
